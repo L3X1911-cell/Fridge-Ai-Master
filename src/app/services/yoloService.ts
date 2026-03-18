@@ -35,20 +35,56 @@ export class YOLOService {
 
             const baseUrl = import.meta.env.BASE_URL || "/";
             ort.env.wasm.wasmPaths = `${baseUrl}wasm/`;
-            ort.env.wasm.numThreads = 1;
+            ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 4);
+            
+            // 嘗試啟用 WebGPU (如果瀏覽器支援)
+            const providers = ["wasm"];
+            try {
+                if ('gpu' in navigator) {
+                    // 優先使用 WebGPU，對於 FP16 模型支援較好
+                    providers.unshift("webgpu");
+                    console.log("🚀 [YOLO] 偵測到 WebGPU 支援，已加入執行提供者優先級");
+                } else {
+                    providers.unshift("webgl");
+                }
+            } catch (e) {
+                providers.unshift("webgl");
+            }
 
-            const modelUrl = `${baseUrl}best.onnx?v=1.0.2`;
+            const modelUrl = `${baseUrl}best.onnx?v=1.0.3`;
+            
+            console.log(`📡 [YOLO] 正在從 ${modelUrl} 載入模型...`);
             
             this.session = await ort.InferenceSession.create(modelUrl, {
-                executionProviders: ["webgl", "wasm"],
-                graphOptimizationLevel: "all"
+                executionProviders: providers,
+                // 對於某些量化模型或特定算子 (如 DynamicQuantizeLinear)，
+                // 'all' 可能會觸發不相容的優化路徑，改用 'basic' 提高相容性。
+                graphOptimizationLevel: "basic" 
             });
 
             this.isReady = true;
             this.isInitializing = false;
-            console.log("✅ [YOLO] 核心準備就緒 (全域執行緒已掛載)");
-        } catch (e) {
+            console.log(`✅ [YOLO] 核心準備就緒 (使用: ${this.session.handler?.provider || "預設"})`);
+        } catch (e: any) {
             console.error("❌ [YOLO] 預熱失敗:", e);
+            
+            // 如果 WebGPU/WebGL 失敗，嘗試最後一搏：純 WASM
+            if (e.message?.includes("invalid") || e.message?.includes("fail")) {
+                console.warn("⚠️ 嘗試以純 WASM (相容模式) 重新載入...");
+                try {
+                    const ort = (window as any).ort;
+                    const baseUrl = import.meta.env.BASE_URL || "/";
+                    this.session = await ort.InferenceSession.create(`${baseUrl}best.onnx?v=1.0.3`, {
+                        executionProviders: ["wasm"],
+                        graphOptimizationLevel: "disabled"
+                    });
+                    this.isReady = true;
+                    console.log("✅ [YOLO] 使用 WASM 相容模式啟動成功");
+                } catch (retryError) {
+                    console.error("💀 [YOLO] 最終載入失敗:", retryError);
+                }
+            }
+            
             this.isInitializing = false;
         }
     }

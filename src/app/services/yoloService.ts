@@ -38,7 +38,7 @@ export class YOLOService {
             // 啟用多執行緒支援 (SIMD)
             ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 4);
 
-            const modelUrl = `${baseUrl}best.onnx?v=1.0.6`;
+            const modelUrl = `${baseUrl}best.onnx?v=1.0.7`;
             console.log(`📡 [YOLO] 正在載入優化後的模型... (${modelUrl})`);
             
             // 優先嘗試 WebGPU (效能最高) -> WebGL -> WASM (相容模式)

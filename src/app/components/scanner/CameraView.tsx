@@ -79,24 +79,29 @@ export function CameraView({ videoRef }: CameraViewProps) {
 
         try {
             // ... (existing YOLO logic)
+            // ✅ 行動裝置優化：自動降低推理解析度 (320 vs 640)
+            const SIZE = yoloService.inferenceSize;
             const canvas = document.createElement("canvas");
-            canvas.width = 640;
-            canvas.height = 640;
+            canvas.width = SIZE;
+            canvas.height = SIZE;
             const ctx = canvas.getContext("2d");
             if (!ctx) return;
-            ctx.drawImage(videoRef.current, 0, 0, 640, 640);
+            ctx.drawImage(videoRef.current, 0, 0, SIZE, SIZE);
 
-            const imgData = ctx.getImageData(0, 0, 640, 640);
-            const input = new Float32Array(3 * 640 * 640);
-            for (let i = 0; i < 640 * 640; i++) {
+            const imgData = ctx.getImageData(0, 0, SIZE, SIZE);
+            const input = new Float32Array(3 * SIZE * SIZE);
+            for (let i = 0; i < SIZE * SIZE; i++) {
                 input[i] = imgData.data[i * 4] / 255.0;
-                input[i + 640 * 640] = imgData.data[i * 4 + 1] / 255.0;
-                input[i + 2 * 640 * 640] = imgData.data[i * 4 + 2] / 255.0;
+                input[i + SIZE * SIZE] = imgData.data[i * 4 + 1] / 255.0;
+                input[i + 2 * SIZE * SIZE] = imgData.data[i * 4 + 2] / 255.0;
             }
-            const tensor = new window.ort.Tensor("float32", input, [1, 3, 640, 640]);
+            const tensor = new window.ort.Tensor("float32", input, [1, 3, SIZE, SIZE]);
 
             const feeds = { [sessionRef.current.inputNames[0]]: tensor };
             const results = await sessionRef.current.run(feeds);
+            // ✅ 推理後立即釋放 tensor 記憶體，防止行動裝置記憶體堆積導致過熱
+            tensor.dispose?.();
+
             const outputView = results[sessionRef.current.outputNames[0]];
             const output = outputView.data as Float32Array;
             const dims = outputView.dims;
@@ -105,6 +110,8 @@ export function CameraView({ videoRef }: CameraViewProps) {
             // 滑桿值 0-100 對應到信心閾值 0.05~0.85（越低越靈敏）
             const CONF_THRESHOLD = 0.05 + (sensitivity / 100) * 0.80;
 
+            // ✅ 正確計算：解析度動態化後需同步調整 anchor 座標反算
+            const imgSize = yoloService.inferenceSize;
             const isTransposed = dims[1] > dims[2];
             const numAnchors = isTransposed ? dims[1] : dims[2];
             const numChannels = isTransposed ? dims[2] : dims[1];
@@ -131,7 +138,7 @@ export function CameraView({ videoRef }: CameraViewProps) {
                     detections.push({
                         name: CLASS_NAMES[classId],
                         confidence: maxConf,
-                        box: [(cx - w / 2) / 640, (cy - h / 2) / 640, (cx + w / 2) / 640, (cy + h / 2) / 640],
+                        box: [(cx - w / 2) / imgSize, (cy - h / 2) / imgSize, (cx + w / 2) / imgSize, (cy + h / 2) / imgSize],
                         isSpoiled: CLASS_NAMES[classId].toLowerCase().includes("rotten"),
                         category: CLASS_NAMES[classId].includes("apple") || CLASS_NAMES[classId].includes("orange") || CLASS_NAMES[classId].includes("banana") ? "水果" : (CLASS_NAMES[classId].includes("cabbage") || CLASS_NAMES[classId].includes("spinach") ? "蔬菜" : (CLASS_NAMES[classId].includes("meat") ? "肉類" : "其他"))
                     });

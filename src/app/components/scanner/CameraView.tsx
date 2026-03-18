@@ -252,8 +252,8 @@ export function CameraView({ videoRef }: CameraViewProps) {
 
                 {/* 攝影機渲染區 (Camera Viewport) */}
                 <div className="relative aspect-[4/5] sm:aspect-[3/4] rounded-[2.5rem] overflow-hidden bg-black border border-white/10 shadow-inner group">
-                    {/* 精英級掃描線動效 */}
-                    {isScanning && scanMode === "local" && (
+                    {/* 精英級掃描線動效 (通用) */}
+                    {isScanning && (
                         <div className="animate-scan-laser" />
                     )}
                     
@@ -290,12 +290,6 @@ export function CameraView({ videoRef }: CameraViewProps) {
                     </div>
 
                     <div className="absolute inset-0 bg-gradient-to-b from-[#0f2e24]/40 to-transparent pointer-events-none" />
-
-                    {isScanning && (
-                        <div className="absolute inset-0 bg-primary/5 flex flex-col items-center justify-center">
-                            <div className="w-full h-[2px] bg-amber-400 shadow-[0_0_15px_#fbbf24] absolute top-0 animate-[scan_2s_ease-in-out_infinite]" />
-                        </div>
-                    )}
                 </div>
             </div>
 

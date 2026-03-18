@@ -35,56 +35,54 @@ export class YOLOService {
 
             const baseUrl = import.meta.env.BASE_URL || "/";
             ort.env.wasm.wasmPaths = `${baseUrl}wasm/`;
+            // 啟用多執行緒支援 (SIMD)
             ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 4);
+
+            const modelUrl = `${baseUrl}best.onnx?v=1.0.6`;
+            console.log(`📡 [YOLO] 正在載入優化後的模型... (${modelUrl})`);
             
-            // 嘗試啟用 WebGPU (如果瀏覽器支援)
+            // 優先嘗試 WebGPU (效能最高) -> WebGL -> WASM (相容模式)
             const providers = ["wasm"];
             try {
                 if ('gpu' in navigator) {
-                    // 優先使用 WebGPU，對於 FP16 模型支援較好
                     providers.unshift("webgpu");
-                    console.log("🚀 [YOLO] 偵測到 WebGPU 支援，已加入執行提供者優先級");
+                    console.log("🚀 [YOLO] 啟用 WebGPU 加速");
                 } else {
                     providers.unshift("webgl");
+                    console.log("🎨 [YOLO] 啟用 WebGL 加速");
                 }
             } catch (e) {
-                providers.unshift("webgl");
+                console.warn("⚠️ 硬體加速初始化失敗，回退至 WASM 模式");
             }
 
-            const modelUrl = `${baseUrl}best.onnx?v=1.0.3`;
-            
-            console.log(`📡 [YOLO] 正在從 ${modelUrl} 載入模型...`);
-            
             this.session = await ort.InferenceSession.create(modelUrl, {
                 executionProviders: providers,
-                // 對於某些量化模型或特定算子 (如 DynamicQuantizeLinear)，
-                // 'all' 可能會觸發不相容的優化路徑，改用 'basic' 提高相容性。
+                // 對於量化模型，'basic' 級別比 'all' 更穩定，且載入速度更快（減少圖融合時間）
                 graphOptimizationLevel: "basic" 
             });
 
             this.isReady = true;
             this.isInitializing = false;
-            console.log(`✅ [YOLO] 核心準備就緒 (使用: ${this.session.handler?.provider || "預設"})`);
+            console.log(`✅ [YOLO] 核心準備就緒 (Provider: ${this.session.handler?.provider || "WASM"})`);
         } catch (e: any) {
             console.error("❌ [YOLO] 預熱失敗:", e);
             
-            // 如果 WebGPU/WebGL 失敗，嘗試最後一搏：純 WASM
+            // 如果失敗，嘗試最後一搏：完全禁用優化並強制 WASM
             if (e.message?.includes("invalid") || e.message?.includes("fail")) {
-                console.warn("⚠️ 嘗試以純 WASM (相容模式) 重新載入...");
+                console.warn("🔄 [YOLO] 偵測到相容性問題，嘗試啟動極限相容模式...");
                 try {
                     const ort = (window as any).ort;
                     const baseUrl = import.meta.env.BASE_URL || "/";
-                    this.session = await ort.InferenceSession.create(`${baseUrl}best.onnx?v=1.0.3`, {
+                    this.session = await ort.InferenceSession.create(`${baseUrl}best.onnx?v=1.0.6`, {
                         executionProviders: ["wasm"],
                         graphOptimizationLevel: "disabled"
                     });
                     this.isReady = true;
-                    console.log("✅ [YOLO] 使用 WASM 相容模式啟動成功");
+                    console.log("✅ [YOLO] 極限相容模式(WASM-Only) 啟動成功");
                 } catch (retryError) {
-                    console.error("💀 [YOLO] 最終載入失敗:", retryError);
+                    console.error("💀 [YOLO] 模型最終載入失敗:", retryError);
                 }
             }
-            
             this.isInitializing = false;
         }
     }

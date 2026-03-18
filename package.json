@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://darke45678-dev.github.io/Fridge-AI-Master/",
+  "homepage": "https://showtime20401-byte.github.io/AI-fridge-Master/",
   "scripts": {
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",

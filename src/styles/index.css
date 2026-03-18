@@ -37,3 +37,31 @@ html {
 .no-scrollbar::-webkit-scrollbar {
     display: none !important;
 }
+
+/* Sensitivity Slider Styling */
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #00ff88;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+    border: 2px solid #0f2e24;
+    transition: box-shadow 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 18px rgba(0, 255, 136, 0.9);
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #00ff88;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+    border: 2px solid #0f2e24;
+}

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { RefObject, useState, useEffect, useRef } from "react";
-import { Camera, Loader2, RefreshCw, Sparkles, Brain } from "lucide-react";
+import { Camera, Loader2, RefreshCw, Sparkles, Brain, SlidersHorizontal } from "lucide-react";
 import { useIngredients } from "../../services/IngredientContext";
 import { llmService } from "../../services/llmService";
 import { yoloService } from "../../services/yoloService";
@@ -28,6 +28,7 @@ export function CameraView({ videoRef }: CameraViewProps) {
     const [scanMode, setScanMode] = useState<"local" | "cloud">("local");
     const [currentBoxes, setCurrentBoxes] = useState<any[]>([]);
     const [modelLoaded, setModelLoaded] = useState(false);
+    const [sensitivity, setSensitivity] = useState(50); // 0-100, maps to 0.1-0.9 confidence
     const sessionRef = useRef<any>(null);
 
     // 類別名稱對照表 (由 yoloService 統一管理)
@@ -101,7 +102,8 @@ export function CameraView({ videoRef }: CameraViewProps) {
             const dims = outputView.dims;
 
             const detections: any[] = [];
-            const CONF_THRESHOLD = settings.confidenceThreshold;
+            // 滑桿值 0-100 對應到信心閾值 0.05~0.85（越低越靈敏）
+            const CONF_THRESHOLD = 0.05 + (sensitivity / 100) * 0.80;
 
             const isTransposed = dims[1] > dims[2];
             const numAnchors = isTransposed ? dims[1] : dims[2];
@@ -312,6 +314,40 @@ export function CameraView({ videoRef }: CameraViewProps) {
                     {isScanning ? <Loader2 size={24} className="animate-spin" /> : scanMode === "cloud" ? <Sparkles size={24} strokeWidth={3} /> : <Camera size={24} strokeWidth={3} />}
                     <span className="truncate">{isScanning ? "正在分析介面..." : scanMode === "cloud" ? "Gemini 深度辨識" : "開始識別"}</span>
                 </button>
+
+                {/* 靈敏度滑桿 (僅 YOLO 本地模式顯示) */}
+                {scanMode === "local" && (
+                    <div className="bg-[#0f2e24]/60 backdrop-blur-xl rounded-2xl p-4 border border-primary/20">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <SlidersHorizontal size={13} className="text-primary" />
+                                <span className="text-[10px] font-black tracking-widest uppercase text-primary/80">辨識靈敏度</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black text-primary/50 uppercase">閾值</span>
+                                <span className="text-[11px] font-black text-primary font-mono">{(0.05 + (sensitivity / 100) * 0.80).toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <div className="relative">
+                            <input
+                                id="sensitivity-slider"
+                                type="range"
+                                min={0}
+                                max={100}
+                                value={sensitivity}
+                                onChange={(e) => setSensitivity(Number(e.target.value))}
+                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                                style={{
+                                    background: `linear-gradient(to right, #00ff88 ${sensitivity}%, rgba(0,255,136,0.15) ${sensitivity}%)`,
+                                }}
+                            />
+                        </div>
+                        <div className="flex justify-between mt-2">
+                            <span className="text-[9px] text-primary/40 uppercase tracking-wider">高靈敏度 (較寬鬆)</span>
+                            <span className="text-[9px] text-primary/40 uppercase tracking-wider">高精確度 (較嚴格)</span>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
